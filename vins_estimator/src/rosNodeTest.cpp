@@ -17,117 +17,31 @@
 #include <ros/ros.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
+#include <message_filters/subscriber.h>
+#include <message_filters/time_synchronizer.h>
 #include "estimator/estimator.h"
 #include "estimator/parameters.h"
 #include "utility/visualization.h"
 
 Estimator estimator;
 
-queue<sensor_msgs::ImuConstPtr> imu_buf;
-queue<sensor_msgs::PointCloudConstPtr> feature_buf;
-queue<sensor_msgs::ImageConstPtr> img0_buf;
-queue<sensor_msgs::ImageConstPtr> img1_buf;
-std::mutex m_buf;
 
-
-void img0_callback(const sensor_msgs::ImageConstPtr &img_msg)
+void stereo_callback(const sensor_msgs::ImageConstPtr& img0, const sensor_msgs::ImageConstPtr& img1)
 {
-    m_buf.lock();
-    img0_buf.push(img_msg);
-    m_buf.unlock();
+    double time = img0->header.stamp.toSec();
+    cv_bridge::CvImagePtr cv_ptr0, cv_ptr1;
+    cv_ptr0 = cv_bridge::toCvCopy(img0, sensor_msgs::image_encodings::MONO8);
+    cv_ptr1 = cv_bridge::toCvCopy(img1, sensor_msgs::image_encodings::MONO8);
+    
+    estimator.inputImage(time, cv_ptr0->image, cv_ptr1->image);
 }
 
-void img1_callback(const sensor_msgs::ImageConstPtr &img_msg)
+void mono_callback(const sensor_msgs::ImageConstPtr& img0)
 {
-    m_buf.lock();
-    img1_buf.push(img_msg);
-    m_buf.unlock();
-}
-
-
-cv::Mat getImageFromMsg(const sensor_msgs::ImageConstPtr &img_msg)
-{
-    cv_bridge::CvImageConstPtr ptr;
-    if (img_msg->encoding == "8UC1")
-    {
-        sensor_msgs::Image img;
-        img.header = img_msg->header;
-        img.height = img_msg->height;
-        img.width = img_msg->width;
-        img.is_bigendian = img_msg->is_bigendian;
-        img.step = img_msg->step;
-        img.data = img_msg->data;
-        img.encoding = "mono8";
-        ptr = cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::MONO8);
-    }
-    else
-        ptr = cv_bridge::toCvCopy(img_msg, sensor_msgs::image_encodings::MONO8);
-
-    cv::Mat img = ptr->image.clone();
-    return img;
-}
-
-// extract images with same timestamp from two topics
-void sync_process()
-{
-    while(1)
-    {
-        if(STEREO)
-        {
-            cv::Mat image0, image1;
-            std_msgs::Header header;
-            double time = 0;
-            m_buf.lock();
-            if (!img0_buf.empty() && !img1_buf.empty())
-            {
-                double time0 = img0_buf.front()->header.stamp.toSec();
-                double time1 = img1_buf.front()->header.stamp.toSec();
-                if(time0 < time1)
-                {
-                    img0_buf.pop();
-                    printf("throw img0\n");
-                }
-                else if(time0 > time1)
-                {
-                    img1_buf.pop();
-                    printf("throw img1\n");
-                }
-                else
-                {
-                    time = img0_buf.front()->header.stamp.toSec();
-                    header = img0_buf.front()->header;
-                    image0 = getImageFromMsg(img0_buf.front());
-                    img0_buf.pop();
-                    image1 = getImageFromMsg(img1_buf.front());
-                    img1_buf.pop();
-                    //printf("find img0 and img1\n");
-                }
-            }
-            m_buf.unlock();
-            if(!image0.empty())
-                estimator.inputImage(time, image0, image1);
-        }
-        else
-        {
-            cv::Mat image;
-            std_msgs::Header header;
-            double time = 0;
-            m_buf.lock();
-            if(!img0_buf.empty())
-            {
-                time = img0_buf.front()->header.stamp.toSec();
-                header = img0_buf.front()->header;
-                image = getImageFromMsg(img0_buf.front());
-                img0_buf.pop();
-            }
-            m_buf.unlock();
-            if(!image.empty())
-                estimator.inputImage(time, image);
-        }
-
-        std::chrono::milliseconds dura(2);
-        std::this_thread::sleep_for(dura);
-    }
+    double time = img0->header.stamp.toSec();
+    cv_bridge::CvImagePtr cv_ptr;
+    cv_ptr = cv_bridge::toCvCopy(img0, sensor_msgs::image_encodings::MONO8);
+    estimator.inputImage(time, cv_ptr->image);    
 }
 
 
@@ -184,12 +98,6 @@ void restart_callback(const std_msgs::BoolConstPtr &restart_msg)
     if (restart_msg->data == true)
     {
         ROS_WARN("restart the estimator!");
-        m_buf.lock();
-        while(!feature_buf.empty())
-            feature_buf.pop();
-        while(!imu_buf.empty())
-            imu_buf.pop();
-        m_buf.unlock();
         estimator.clearState();
         estimator.setParameter();
     }
@@ -223,14 +131,31 @@ int main(int argc, char **argv)
     ROS_WARN("waiting for image and imu...");
 
     registerPub(n);
-
-    ros::Subscriber sub_imu = n.subscribe(IMU_TOPIC, 2000, imu_callback, ros::TransportHints().tcpNoDelay());
+    
+    if(USE_IMU)
+    {
+	ROS_WARN("USE IMU");
+	ros::Subscriber sub_imu = n.subscribe(IMU_TOPIC, 2000, imu_callback, ros::TransportHints().tcpNoDelay());
+    }
     ros::Subscriber sub_feature = n.subscribe("/feature_tracker/feature", 2000, feature_callback);
-    ros::Subscriber sub_img0 = n.subscribe(IMAGE0_TOPIC, 100, img0_callback);
-    ros::Subscriber sub_img1 = n.subscribe(IMAGE1_TOPIC, 100, img1_callback);
-
-    std::thread sync_thread{sync_process};
-    ros::spin();
-
+    
+    if(STEREO)
+    {
+	ROS_WARN("STEREO");
+	message_filters::Subscriber<sensor_msgs::Image> sub_img0(n, IMAGE0_TOPIC, 1);
+	message_filters::Subscriber<sensor_msgs::Image>sub_img1(n, IMAGE1_TOPIC, 1);
+	message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::Image>sync(sub_img0, sub_img1, 2);
+	sync.registerCallback(boost::bind(&stereo_callback, _1, _2));
+	ros::spin();
+    }else
+    {
+	ROS_WARN("MONO");
+	ros::Subscriber sub_img = n.subscribe(IMAGE0_TOPIC, 2, mono_callback);
+	ros::spin();
+    }
+    
+    //std::thread sync_thread{sync_process};
+    
+    
     return 0;
 }
