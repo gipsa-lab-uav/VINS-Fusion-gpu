@@ -20,17 +20,21 @@
 #include <stdio.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <tf/transform_broadcaster.h>
+#include <tf/transform_datatypes.h>
 
 GlobalOptimization globalEstimator;
 ros::Publisher pub_global_odometry, pub_global_path, pub_car;
 nav_msgs::Path *global_path;
+
+std::string world_frame_id("world");
 
 void publish_car_model(double t, Eigen::Vector3d t_w_car, Eigen::Quaterniond q_w_car)
 {
     visualization_msgs::MarkerArray markerArray_msg;
     visualization_msgs::Marker car_mesh;
     car_mesh.header.stamp = ros::Time(t);
-    car_mesh.header.frame_id = "world";
+    car_mesh.header.frame_id = world_frame_id;
     car_mesh.type = visualization_msgs::Marker::MESH_RESOURCE;
     car_mesh.action = visualization_msgs::Marker::ADD;
     car_mesh.id = 0;
@@ -91,13 +95,13 @@ void vio_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
     globalEstimator.inputOdom(t, vio_t, vio_q);
 
     Eigen::Vector3d global_t;
-    Eigen:: Quaterniond global_q;
+    Eigen::Quaterniond global_q;
     globalEstimator.getGlobalOdom(global_t, global_q);
 
     nav_msgs::Odometry odometry;
     odometry.header = pose_msg->header;
-    odometry.header.frame_id = "world";
-    odometry.child_frame_id = "world";
+    odometry.header.frame_id = world_frame_id;
+    odometry.child_frame_id = pose_msg->child_frame_id;
     odometry.pose.pose.position.x = global_t.x();
     odometry.pose.pose.position.y = global_t.y();
     odometry.pose.pose.position.z = global_t.z();
@@ -105,6 +109,15 @@ void vio_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
     odometry.pose.pose.orientation.y = global_q.y();
     odometry.pose.pose.orientation.z = global_q.z();
     odometry.pose.pose.orientation.w = global_q.w();
+    
+    static tf::TransformBroadcaster br;
+    tf::Transform odom2body, world2body;
+    tf::poseMsgToTF(pose_msg->pose.pose, odom2body);
+    tf::poseMsgToTF(odometry.pose.pose, world2body);
+
+    br.sendTransform(tf::StampedTransform(world2body*odom2body.inverse(), pose_msg->header.stamp, world_frame_id, pose_msg->header.frame_id));
+    
+    
     pub_global_odometry.publish(odometry);
     pub_global_path.publish(*global_path);
     publish_car_model(t, global_t, global_q);
@@ -116,7 +129,9 @@ int main(int argc, char **argv)
     ros::NodeHandle n("~");
 
     global_path = &globalEstimator.global_path;
-
+    
+    n.param("world_frame_id", world_frame_id, std::string("world"));
+    
     ros::Subscriber sub_GPS = n.subscribe("/gps", 100, GPS_callback);
     ros::Subscriber sub_vio = n.subscribe("/vins_estimator/odometry", 100, vio_callback);
     pub_global_path = n.advertise<nav_msgs::Path>("global_path", 100);
