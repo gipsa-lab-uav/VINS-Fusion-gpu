@@ -132,10 +132,11 @@ int main(int argc, char **argv)
 
     registerPub(n);
     
+    ros::Subscriber sub_imu;
     if(USE_IMU)
     {
 	ROS_WARN("USE IMU");
-	ros::Subscriber sub_imu = n.subscribe(IMU_TOPIC, 2000, imu_callback, ros::TransportHints().tcpNoDelay());
+	sub_imu = n.subscribe(IMU_TOPIC, 2000, imu_callback, ros::TransportHints().tcpNoDelay());
     }
     ros::Subscriber sub_feature = n.subscribe("/feature_tracker/feature", 2000, feature_callback);
     
