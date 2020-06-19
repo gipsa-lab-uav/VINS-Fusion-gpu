@@ -167,6 +167,7 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
                         status[i] = 0;
                 }
             }
+	    ROS_DEBUG("temporal optical flow costs: %fms", t_o.toc());
             // printf("temporal optical flow costs: %fms\n", t_o.toc());
         }
         else
@@ -268,6 +269,7 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
                         status[i] = 0;
                 }
             }
+	    ROS_DEBUG("gpu temporal optical flow costs: %f ms", t_og.toc());
             // printf("gpu temporal optical flow costs: %f ms\n",t_og.toc());
         }
     
@@ -278,7 +280,7 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         reduceVector(cur_pts, status);
         reduceVector(ids, status);
         reduceVector(track_cnt, status);
-        // ROS_DEBUG("temporal optical flow costs: %fms", t_o.toc());
+        //ROS_DEBUG("temporal optical flow costs: %fms", t_o.toc());
         
         //printf("track cnt %d\n", (int)ids.size());
     }
@@ -292,7 +294,7 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         ROS_DEBUG("set mask begins");
         TicToc t_m;
         setMask();
-        // ROS_DEBUG("set mask costs %fms", t_m.toc());
+        ROS_DEBUG("set mask costs %fms", t_m.toc());
         // printf("set mask costs %fms\n", t_m.toc());
         ROS_DEBUG("detect feature begins");
         
