@@ -136,15 +136,15 @@ int main(int argc, char **argv)
     if(USE_IMU)
     {
 	ROS_WARN("USE IMU");
-	sub_imu = n.subscribe(IMU_TOPIC, 2000, imu_callback, ros::TransportHints().tcpNoDelay());
+	sub_imu = n.subscribe(IMU_TOPIC, 10, imu_callback, ros::TransportHints().tcpNoDelay());
     }
-    ros::Subscriber sub_feature = n.subscribe("/feature_tracker/feature", 2000, feature_callback);
+    ros::Subscriber sub_feature = n.subscribe("/feature_tracker/feature", 2, feature_callback);
     
     if(STEREO)
     {
 	ROS_WARN("STEREO");
 	message_filters::Subscriber<sensor_msgs::Image> sub_img0(n, IMAGE0_TOPIC, 1);
-	message_filters::Subscriber<sensor_msgs::Image>sub_img1(n, IMAGE1_TOPIC, 1);
+	message_filters::Subscriber<sensor_msgs::Image> sub_img1(n, IMAGE1_TOPIC, 1);
 	message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::Image>sync(sub_img0, sub_img1, 2);
 	sync.registerCallback(boost::bind(&stereo_callback, _1, _2));
 	ros::spin();

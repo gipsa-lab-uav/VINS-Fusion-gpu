@@ -62,6 +62,8 @@ void registerPub(ros::NodeHandle &n)
 
 void pubLatestOdometry(const Eigen::Vector3d &P, const Eigen::Quaterniond &Q, const Eigen::Vector3d &V, double t)
 {
+    if(pub_latest_odometry.getNumSubscribers()==0)
+	return;
     nav_msgs::Odometry odometry;
     odometry.header.stamp = ros::Time(t);
     odometry.header.frame_id = odom_frame_id;
@@ -154,7 +156,8 @@ void pubOdometry(const Estimator &estimator, const std_msgs::Header &header)
         pub_path.publish(path);
 
         // write result to file
-        ofstream foutC(VINS_RESULT_PATH, ios::app);
+        /*****
+	ofstream foutC(VINS_RESULT_PATH, ios::app);
         foutC.setf(ios::fixed, ios::floatfield);
         foutC.precision(0);
         foutC << header.stamp.toSec() * 1e9 << ",";
@@ -173,11 +176,15 @@ void pubOdometry(const Estimator &estimator, const std_msgs::Header &header)
         Eigen::Vector3d tmp_T = estimator.Ps[WINDOW_SIZE];
         printf("time: %f, t: %f %f %f q: %f %f %f %f \n", header.stamp.toSec(), tmp_T.x(), tmp_T.y(), tmp_T.z(),
                                                           tmp_Q.w(), tmp_Q.x(), tmp_Q.y(), tmp_Q.z());
+	****/
     }
 }
 
 void pubKeyPoses(const Estimator &estimator, const std_msgs::Header &header)
 {
+    if(pub_key_poses.getNumSubscribers()==0)
+	return;
+
     if (estimator.key_poses.size() == 0)
         return;
     visualization_msgs::Marker key_poses;
@@ -212,6 +219,7 @@ void pubKeyPoses(const Estimator &estimator, const std_msgs::Header &header)
 
 void pubCameraPose(const Estimator &estimator, const std_msgs::Header &header)
 {
+/********
     int idx2 = WINDOW_SIZE - 1;
 
     if (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR)
@@ -292,11 +300,15 @@ void pubCameraPose(const Estimator &estimator, const std_msgs::Header &header)
         }
         cameraposevisual.publish_by(pub_camera_pose_visual, odometry.header);
     }
+*******/
 }
 
 
 void pubPointCloud(const Estimator &estimator, const std_msgs::Header &header)
 {
+    if(pub_point_cloud.getNumSubscribers()==0 && pub_margin_cloud.getNumSubscribers()==0)
+	return;
+
     sensor_msgs::PointCloud point_cloud, loop_point_cloud;
     point_cloud.header = header;
     loop_point_cloud.header = header;
@@ -406,6 +418,8 @@ void pubTF(const Estimator &estimator, const std_msgs::Header &header)
 
 void pubKeyframe(const Estimator &estimator)
 {
+    if(pub_keyframe_pose.getNumSubscribers()==0 && pub_keyframe_point.getNumSubscribers()==0)
+	return;
     // pub camera pose, 2D-3D points of keyframe
     if (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR && estimator.marginalization_flag == 0)
     {
