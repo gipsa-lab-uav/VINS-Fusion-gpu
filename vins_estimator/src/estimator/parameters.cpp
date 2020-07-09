@@ -51,6 +51,7 @@ double F_THRESHOLD;
 int SHOW_TRACK;
 int FLOW_BACK;
 
+int FEATURE_BUF_SIZE;
 
 template <typename T>
 T readParam(ros::NodeHandle &n, std::string name)
@@ -91,6 +92,8 @@ void readParameters(std::string config_file)
     F_THRESHOLD = fsSettings["F_threshold"];
     SHOW_TRACK = fsSettings["show_track"];
     FLOW_BACK = fsSettings["flow_back"];
+
+    FEATURE_BUF_SIZE = fsSettings["feature_buf_size"];
 
     MULTIPLE_THREAD = fsSettings["multiple_thread"];
 

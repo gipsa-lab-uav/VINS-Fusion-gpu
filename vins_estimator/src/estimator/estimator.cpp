@@ -52,6 +52,13 @@ void Estimator::setParameter()
 void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1)
 {
 //     if(begin_time_count<=0)
+    
+    if(featureBuf.size()>=FEATURE_BUF_SIZE)
+    {
+	printf("Feature buffer full : camera image ignored\n");
+	return;
+    }
+	
     inputImageCnt++;
     map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> featureFrame;
     // TicToc featureTrackerTime;
