@@ -53,8 +53,8 @@ void registerPub(ros::NodeHandle &n)
     pub_extrinsic = n.advertise<nav_msgs::Odometry>("extrinsic", 1000);
     
     ros::NodeHandle private_nh("~");
-    private_nh.param("odom_frame_id", odom_frame_id, std::string("odom"));
-    private_nh.param("body_frame_id", body_frame_id, std::string("base_link"));
+    private_nh.param("odom_frame_id", odom_frame_id, std::string("world"));//odom
+    private_nh.param("body_frame_id", body_frame_id, std::string("body"));//base_link
     
     cameraposevisual.setScale(0.1);
     cameraposevisual.setLineWidth(0.01);
@@ -219,9 +219,17 @@ void pubKeyPoses(const Estimator &estimator, const std_msgs::Header &header)
 
 void pubCameraPose(const Estimator &estimator, const std_msgs::Header &header)
 {
-/********
+    if(pub_camera_pose_right.getNumSubscribers()==0
+       && pub_rectify_pose_left.getNumSubscribers()==0 
+       && pub_rectify_pose_right.getNumSubscribers()==0
+       && pub_camera_pose.getNumSubscribers()==0
+       && pub_camera_pose_visual.getNumSubscribers()==0)
+    {
+	return;
+    }
+    
     int idx2 = WINDOW_SIZE - 1;
-
+    
     if (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR)
     {
         int i = idx2;
@@ -300,7 +308,6 @@ void pubCameraPose(const Estimator &estimator, const std_msgs::Header &header)
         }
         cameraposevisual.publish_by(pub_camera_pose_visual, odometry.header);
     }
-*******/
 }
 
 
